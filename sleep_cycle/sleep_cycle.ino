@@ -21,7 +21,9 @@
 #define tempTH 1.0
 #define humTH 1.0
 //Threshold flags
-int temp_FLAG, hum_FLAG = 0;
+int temp_FLAG, hum_FLAG, DOWNLINK_FLAG = 0;
+
+int downlink_value = 0;
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -105,9 +107,23 @@ void LoRa_Packet_Sender() {
   int err;
 
   Serial.println("In LoRa_Packet_Sender");
+
+  //test clpp payload
+  int humidity = random(0,100);
+  int temp = random(0,40);
+  
+  lpp.reset();
+  
+  lpp.addTemperature(1, temp);
+  lpp.addRelativeHumidity(2, humidity);
+
+  if (DOWNLINK_FLAG) {
+    DOWNLINK_FLAG = 0;
+    lpp.addDigitalInput(3, downlink_value);
+  }
   
   modem.beginPacket();
-  modem.print(message);
+  modem.write(lpp.getBuffer(), lpp.getSize());
   err = modem.endPacket(false);
   
   if (err > 0) {
@@ -122,20 +138,9 @@ void LoRa_Packet_Sender() {
     Serial.println("No downlink message received at this time.");
   }
   else  {
-    char rcv[64];
-    int i = 0;
-    while (modem.available()) {
-      rcv[i++] = (char)modem.read();
-    }
-    Serial.print("Received: ");
-    for (unsigned int j = 0; j < i; j++) {
-      Serial.print(rcv[j] >> 4, HEX);
-      Serial.print(rcv[j] & 0xF, HEX);
-      Serial.print(" ");
-      message[j] = rcv[j];
-    }
-    Serial.println();
+    receive_message();
   }
+  
   // Putting LoRa Module to Sleep 
   Serial.println(F("LoRa Going in Sleep"));
   modem.sleep(SLEEP_TIME);
@@ -151,6 +156,27 @@ void GoToSleep(){
   //delay(SLEEP_TIME);
   //Serial.begin(9600); 
   //while (!Serial);
+}
+
+void receive_message() {
+  char rcv[64];
+  int i = 0;
+  while (modem.available()) {
+    rcv[i++] = (char)modem.read();
+  }
+  Serial.print("Received: ");
+  for (unsigned int j = 0; j < i; j++) {
+    Serial.print(rcv[j] >> 4, HEX);
+    Serial.print(rcv[j] & 0xF, HEX);
+    Serial.print(" ");
+    message[j] = rcv[j];
+  }
+  Serial.println();
+
+  DOWNLINK_FLAG = 1;
+
+  downlink_value = (int)rcv[0];
+  
 }
 
 //Test Functions
