@@ -63,72 +63,19 @@ void setup(void) {
   }
 
   delay(2000);
-
-  test_send_packet();
-
-  //setup interrupt to send packet each 10 seconds
-  
 }
 
 void loop(void) {
   
   Serial.println("In Loop");
-  
 
   //send_msg_and_wait();
-  
   //ReadSensor();
   LoRa_Packet_Sender();
-  //GoToSleep();
-  
-  delay(5000);
+  GoToSleep();
 }
 
-void send_msg_and_wait() {
-  if (modem.available()) {
-    char rcv[64];
-    int i = 0;
-    
-    while (modem.available()) {
-      rcv[i++] = (char)modem.read();
-    }
-    
-    Serial.print("Received: ");
-    for (unsigned int j = 0; j < i; j++) {
-      Serial.print(rcv[j] >> 4, HEX);
-      Serial.print(rcv[j] & 0xF, HEX);
-      Serial.print(" ");
-    }
-    Serial.println();
-  }
 
-  if (Serial.available() > 0) {
-    int trash = Serial.read();
-    Serial.flush();
-    test_send_packet();
-    delay(1000);
-  }
-}
-
-void test_send_packet() {
-
-  int err;
-  modem.beginPacket();
-
-  modem.print("Hi");
-
-  err = modem.endPacket(true);
-
-  if (err > 0) {
-
-    Serial.println("Message sent correctly!");
-
-  } else {
-
-    Serial.println("Error sending message :(");
-
-  }
-}
 void ReadSensor() {
   
   temp_FLAG = 0;
@@ -190,8 +137,8 @@ void LoRa_Packet_Sender() {
     Serial.println();
   }
   // Putting LoRa Module to Sleep 
-  //Serial.println(F("LoRa Going in Sleep"));
-  //modem.sleep(SLEEP_TIME);
+  Serial.println(F("LoRa Going in Sleep"));
+  modem.sleep(SLEEP_TIME);
 }
 
 // Sleep Task 
@@ -200,8 +147,55 @@ void GoToSleep(){
   Serial.println(F("MKR WAN 1310 - Going in Sleep"));
   //Serial.end();
   
-  //LowPower.deepSleep(SLEEP_TIME);
-  delay(SLEEP_TIME);
+  LowPower.deepSleep(SLEEP_TIME);
+  //delay(SLEEP_TIME);
   //Serial.begin(9600); 
   //while (!Serial);
+}
+
+//Test Functions
+void send_msg_and_wait() {
+  if (modem.available()) {
+    char rcv[64];
+    int i = 0;
+    
+    while (modem.available()) {
+      rcv[i++] = (char)modem.read();
+    }
+    
+    Serial.print("Received: ");
+    for (unsigned int j = 0; j < i; j++) {
+      Serial.print(rcv[j] >> 4, HEX);
+      Serial.print(rcv[j] & 0xF, HEX);
+      Serial.print(" ");
+    }
+    Serial.println();
+  }
+
+  if (Serial.available() > 0) {
+    int trash = Serial.read();
+    Serial.flush();
+    test_send_packet();
+    delay(1000);
+  }
+}
+
+void test_send_packet() {
+
+  int err;
+  modem.beginPacket();
+
+  modem.print("Hi");
+
+  err = modem.endPacket(true);
+
+  if (err > 0) {
+
+    Serial.println("Message sent correctly!");
+
+  } else {
+
+    Serial.println("Error sending message :(");
+
+  }
 }
