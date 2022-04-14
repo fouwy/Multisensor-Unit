@@ -8,7 +8,7 @@
 #include<CayenneLPP.h>
 
 // LoRa Library
-#include <SPI.h>
+//#include <SPI.h>
 #include <MKRWAN.h>
 
 //Duration of sleep mode in miliseconds
