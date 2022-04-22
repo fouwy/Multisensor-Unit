@@ -176,17 +176,26 @@ void setup() {
       Serial.println("Sensor not supported");
     }
   }
-
-  taskManager.scheduleFixedRate(1000, toggle);
+  
+  
+  //TEST this later
+  taskManager.scheduleFixedRate(1000, [] { Serial.println("1000 millis past!"); });
 
   taskManager.scheduleFixedRate(2345, [] { Serial.println("2345 millis past!"); });
-}
 
-void loop() {
+  //-------
+  for (int i=0; i<deviceAmount; i++) {
+    taskManager.scheduleFixedRate(sensors[i].aqui_rate, [i]() {toggle((float)i);});
+  }
   
 }
 
-void toggle() {
+void loop() {
+  taskManager.runLoop();
+  
+}
+
+void toggle(float calib) {
   Serial.println("Toggle");  
 }
 
