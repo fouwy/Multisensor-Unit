@@ -1,6 +1,9 @@
 #include <FlashStorage.h>
 #include <OneWire.h>
 #include "TEDSDevices.h"
+#include <TaskManagerIO.h>
+
+#define MAX_SENSORS 10
 
 OneWire  ds(2);    // 1-wire on pin 2
 byte     addr[8];  // Contains the eeprom unique ID
@@ -35,13 +38,16 @@ typedef struct {
 } BasicTEDS;
 
 
+Sensor sensors[MAX_SENSORS];
+int deviceAmount = 2; //REVERT THIS VALUE TO 0 AFTER TESTING
+
 void setup() {
   Serial.begin(9600);
   while (!Serial) { }
 
   //TODO: recognize which sensors are connected
   
-  int deviceAmount = 2; //REVERT THIS VALUE TO 0 AFTER TESTING
+  
   
   while (SearchAddress(addr)) { //This will reset the search after no more devices are found.
     deviceAmount++;
@@ -56,7 +62,6 @@ void setup() {
   Serial.println(deviceAmount);
   
   BasicTEDS teds[deviceAmount];
-  Sensor sensors[deviceAmount];
   
   for (int i=0; i<deviceAmount; i++) {
     SearchAddress(addr);
@@ -170,46 +175,21 @@ void setup() {
     } else {
       Serial.println("Sensor not supported");
     }
-    
-  }
-  
-  while (1) { }
-  
-  Sensor waterLevel;
-
-  waterLevel = waterSensor.read();
-
-  if (waterLevel.valid == false) {
-
-      Serial.println("No data in memory");
-
-      strcpy(waterLevel.ID, "water");
-      waterLevel.threshold = 20;
-      waterLevel.aqui_rate = 5000;
-      waterLevel.calib_multiplier = 1.0;
-      waterLevel.valid = true;
-
-      waterSensor.write(waterLevel);
   }
 
-  else {
-    
-    Serial.println("Data found");
-    Serial.print("Sensor ID: ");
-    Serial.println(waterLevel.ID); 
-    Serial.print("Threshold: ");
-    Serial.println(waterLevel.threshold);
-    Serial.print("Aquisition Rate: ");
-    Serial.println(waterLevel.aqui_rate);
-    Serial.print("Calibration Multiplier: ");
-    Serial.println(waterLevel.calib_multiplier);
-  }
-  
+  taskManager.scheduleFixedRate(1000, toggle);
+
+  taskManager.scheduleFixedRate(2345, [] { Serial.println("2345 millis past!"); });
 }
 
 void loop() {
-
+  
 }
+
+void toggle() {
+  Serial.println("Toggle");  
+}
+
 
 void ReadAndSave()
 {
