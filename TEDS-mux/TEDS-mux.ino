@@ -2,8 +2,12 @@
 #include <OneWire.h>
 #include "TEDSDevices.h"
 #include <TaskManagerIO.h>
+#include "ArduinoLowPower.h"
 
 #define MAX_SENSORS 10
+
+const int selectPins[3] = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
+const int muxPin  = 1;  //Common output of multiplexer
 
 OneWire  ds(2);    // 1-wire on pin 2
 byte     addr[8];  // Contains the eeprom unique ID
@@ -41,13 +45,29 @@ typedef struct {
 Sensor sensors[MAX_SENSORS];
 int deviceAmount = 2; //REVERT THIS VALUE TO 0 AFTER TESTING
 
+//Have to be global variables to pass to taskManager function
+int deviceCount = 0;
+float deviceCalib = 0;
+
 void setup() {
   Serial.begin(9600);
   while (!Serial) { }
 
+
+  for (int i=0; i<3; i++)
+  {
+    pinMode(selectPins[i], OUTPUT);
+    digitalWrite(selectPins[i], LOW);
+  }
+  pinMode(muxPin, OUTPUT);
+  
   //TODO: recognize which sensors are connected
-  
-  
+  //
+  for (int pin=0; pin<=7; pin++) {
+    
+    selectMuxPin(pin);
+    
+  }
   
   while (SearchAddress(addr)) { //This will reset the search after no more devices are found.
     deviceAmount++;
@@ -183,22 +203,57 @@ void setup() {
 
   taskManager.scheduleFixedRate(2345, [] { Serial.println("2345 millis past!"); });
 
-  //-------
-  for (int i=0; i<deviceAmount; i++) {
-    taskManager.scheduleFixedRate(sensors[i].aqui_rate, [i]() {toggle((float)i);});
-  }
+  //-------Actual code for the tasks
+//  for (int i=0; i < deviceAmount; i++) {
+//    deviceCalib = sensors[i].calib_multiplier;
+//    taskManager.scheduleFixedRate(sensors[i].aqui_rate, [deviceCalib]() {readSensor(deviceCalib);});
+//  }
   
 }
 
 void loop() {
   taskManager.runLoop();
   
+  int millisDelay = (taskManager.microsToNextTask() / 1000UL);
+  
+  if(millisDelay > 100) {
+    Serial.print("Enter low power for ");
+    Serial.println(millisDelay);
+  
+    // here we call into the low power library for SAMD to reduce power usage for
+    // the time that no tasks are running.
+    LowPower.idle(millisDelay);
+  }
+  
 }
 
-void toggle(float calib) {
-  Serial.println("Toggle");  
+void readSensor(float calib) {
+  Serial.print("Toggle - ");
+  Serial.println(calib); 
+
+  int val = 0;
+  //put mux on correct output
+  //Read sensor
+  //Calibrate it 
+  //Store it
+
+  
+  val = analogRead(muxPin);
+
+  
 }
 
+void selectMuxPin(byte pin)
+{
+  if (pin > 7) return; // Exit if pin is out of scope
+  for (int i=0; i<3; i++)
+  {
+    if (pin & (1<<i))
+      digitalWrite(selectPins[i], HIGH);
+    else
+      digitalWrite(selectPins[i], LOW);
+  }
+}
 
 void ReadAndSave()
 {
