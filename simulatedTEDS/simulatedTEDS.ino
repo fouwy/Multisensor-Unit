@@ -6,7 +6,7 @@
 
 #define MAX_SENSORS 10
 
-OneWire  ds(2);    // 1-wire on pin 2
+OneWire  ds(8);    // 1-wire on pin 2
 byte     addr[8];  // Contains the eeprom unique ID
 byte memory[128];
 
@@ -61,8 +61,7 @@ void setup() {
 
   Serial.print("Device amount: ");
   Serial.println(deviceAmount);
-
-  while (1) {}
+  
   BasicTEDS teds[deviceAmount];
   
   for (int i=0; i<deviceAmount; i++) {
@@ -73,8 +72,6 @@ void setup() {
   
 
   Serial.println(teds[0].man_ID);
-  Serial.println(teds[1].man_ID);
-
 
   //Setup each sensor
   for (int i=0; i<deviceAmount; i++) {
@@ -82,6 +79,7 @@ void setup() {
     if (teds[i].man_ID == 0) {
       switch (teds[i].model) {
         case WATER_LVL_SENSOR:
+          Serial.println("In water level sensor code");
           sensors[i] = waterSensor.read();
 
           if (sensors[i].valid == false) {
@@ -176,20 +174,21 @@ void setup() {
       }
     } else {
       Serial.println("Sensor not supported");
+      while (1) {};
     }
   }
   
   
   //TEST this later
-  taskManager.scheduleFixedRate(1000, [] { Serial.println("1000 millis past!"); });
+  //taskManager.scheduleFixedRate(1000, [] { Serial.println("1000 millis past!"); });
 
-  taskManager.scheduleFixedRate(2345, [] { Serial.println("2345 millis past!"); });
+  //taskManager.scheduleFixedRate(2345, [] { Serial.println("2345 millis past!"); });
 
-  //-------Actual code for the tasks
-//  for (int i=0; i < deviceAmount; i++) {
-//    deviceCalib = sensors[i].calib_multiplier;
-//    taskManager.scheduleFixedRate(sensors[i].aqui_rate, [deviceCalib]() {readSensor(deviceCalib);});
-//  }
+//  -------Actual code for the tasks
+  for (int i=0; i < deviceAmount; i++) {
+    deviceCalib = sensors[i].calib_multiplier;
+    taskManager.scheduleFixedRate(sensors[i].aqui_rate, [deviceCalib]() {readSensor(deviceCalib);});
+  }
   
 }
 
@@ -204,7 +203,13 @@ void loop() {
   
     // here we call into the low power library for SAMD to reduce power usage for
     // the time that no tasks are running.
-    LowPower.idle(millisDelay);
+    USBDevice.detach();
+    LowPower.deepSleep(millisDelay);
+    USBDevice.attach();
+    delay(1000);
+    while(!Serial) {}
+
+    //use a LED instead of Serial 
   }
   
 }
@@ -265,11 +270,10 @@ boolean SearchAddress(byte* address) //Search for address and confirm it
 }
 
 void getBasicTEDS(int& man_ID, int& model, int& ver_letter, int& version, int& serial) {
-  man_ID = 1;
 
-//  man_ID = ( ( memory[1] & 0x3F ) << 8) | memory[0];
-//  model =  ( ( memory[3] & 0x1F ) << 10) | (memory[2] << 2) | ( memory[1] >> 6);
-//  ver_letter = ( ( memory[4] & 0x03 ) << 3) | (memory[3] >> 5);
-//  version = memory[4] >> 2;
-//  serial = (memory[7] << 16) | (memory[6] << 8) | (memory[5]);
+  man_ID = ( ( memory[1] & 0x3F ) << 8) | memory[0];
+  model =  ( ( memory[3] & 0x1F ) << 10) | (memory[2] << 2) | ( memory[1] >> 6);
+  ver_letter = ( ( memory[4] & 0x03 ) << 3) | (memory[3] >> 5);
+  version = memory[4] >> 2;
+  serial = (memory[7] << 16) | (memory[6] << 8) | (memory[5]);
 }
