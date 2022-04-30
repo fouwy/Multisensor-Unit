@@ -35,7 +35,7 @@ void setup() {
   byte dat[13];
   
   dat[0] = 0x00;
-  dat[1] = 0x00;
+  dat[1] = 0x40;
   dat[2] = 0x00;
   dat[3] = 0x00;
   dat[4] = 0x00;
@@ -43,6 +43,15 @@ void setup() {
   dat[6] = 0x00;
   dat[7] = 0x00;
 
+  /*
+  * 0x00
+  * 0x00 or 0x40 or 0x80 or 0xC0 or ... for other sensors
+  * 0x00 or 0x__ for other sensors
+  * 0x00
+  * 0x00
+  * 
+  */
+  
   WriteRow(0,dat);
   ReadAllMem();
 }

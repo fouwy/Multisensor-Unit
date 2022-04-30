@@ -18,7 +18,7 @@
 //TEMP_HUM SENSOR Defaults
 #define TEMP_HUM_ID          "dht11"
 #define TEMP_HUM_THRESHOLD   20
-#define TEMP_HUM_AQUI_RATE   5000
+#define TEMP_HUM_AQUI_RATE   7000
 #define TEMP_HUM_CALIB_MULT  1.0
 
 //CO2 SENSOR Defaults

@@ -2,6 +2,7 @@
 #include <OneWire.h>
 #include "TEDSDevices.h"
 #include <TaskManagerIO.h>
+#include <ExecWithParameter.h>
 #include "ArduinoLowPower.h"
 
 #define MAX_SENSORS 10
@@ -42,10 +43,6 @@ typedef struct {
 Sensor sensors[MAX_SENSORS];
 int deviceAmount = 0; //REVERT THIS VALUE TO 0 AFTER TESTING
 
-//Have to be global variables to pass to taskManager function
-int deviceCount = 0;
-float deviceCalib = 0;
-
 void setup() {
   Serial.begin(9600);
   while (!Serial) { }
@@ -68,10 +65,12 @@ void setup() {
     SearchAddress(addr);
     ReadAndSave();
     getBasicTEDS(teds[i].man_ID, teds[i].model, teds[i].ver_letter, teds[i].version, teds[i].serial);
+
+    Serial.print("Models: ");
+    Serial.println(teds[i].model);
   }
   
 
-  Serial.println(teds[0].man_ID);
 
   //Setup each sensor
   for (int i=0; i<deviceAmount; i++) {
@@ -98,6 +97,7 @@ void setup() {
           break;
 
         case TEMP_HUM_SENSOR:
+          Serial.println("In heat sensor code");
           sensors[i] = heatSensor.read();
 
           if (sensors[i].valid == false) {
@@ -178,16 +178,9 @@ void setup() {
     }
   }
   
-  
-  //TEST this later
-  //taskManager.scheduleFixedRate(1000, [] { Serial.println("1000 millis past!"); });
-
-  //taskManager.scheduleFixedRate(2345, [] { Serial.println("2345 millis past!"); });
-
-//  -------Actual code for the tasks
   for (int i=0; i < deviceAmount; i++) {
-    deviceCalib = sensors[i].calib_multiplier;
-    taskManager.scheduleFixedRate(sensors[i].aqui_rate, [deviceCalib]() {readSensor(deviceCalib);});
+    auto task = new ExecWithParameter<int>(readSensor, i);
+    taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
   }
   
 }
@@ -197,26 +190,28 @@ void loop() {
   
   int millisDelay = (taskManager.microsToNextTask() / 1000UL);
   
-  if(millisDelay > 100) {
-    Serial.print("Enter low power for ");
-    Serial.println(millisDelay);
-  
-    // here we call into the low power library for SAMD to reduce power usage for
-    // the time that no tasks are running.
-    USBDevice.detach();
-    LowPower.deepSleep(millisDelay);
-    USBDevice.attach();
-    delay(1000);
-    while(!Serial) {}
-
-    //use a LED instead of Serial 
-  }
+//  if(millisDelay > 100) {
+//    Serial.print("Enter low power for ");
+//    Serial.println(millisDelay);
+//  
+//    // here we call into the low power library for SAMD to reduce power usage for
+//    // the time that no tasks are running.
+////    USBDevice.detach();
+//    LowPower.idle(millisDelay);
+////    USBDevice.attach();
+////    delay(1000);
+////    while(!Serial) {}
+//
+//    //use a LED instead of Serial 
+//  }
   
 }
 
-void readSensor(float calib) {
+void readSensor(int deviceNumber) {
   Serial.print("Toggle - ");
-  Serial.println(calib); 
+  Serial.print(sensors[deviceNumber].ID);
+  Serial.print(" - ");
+  Serial.println(sensors[deviceNumber].calib_multiplier); 
   
 }
 
