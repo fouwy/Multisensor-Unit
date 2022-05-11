@@ -3,21 +3,29 @@
 #include "TEDSDevices.h"
 #include <TaskManagerIO.h>
 #include <ExecWithParameter.h>
-#include "ArduinoLowPower.h"
+#include <ArduinoLowPower.h>
+#include "Rules.h"
+#include <ArduinoJson.h>
+
 
 #define MAX_SENSORS 10
 
-OneWire  ds(8);    // 1-wire on pin 2
+OneWire  ds(8);    // 1-wire on pin 8
 byte     addr[8];  // Contains the eeprom unique ID
 byte memory[128];
 
 typedef struct {
   
   boolean valid;
-  int threshold;          //threshold for sending LoRa message
-  int aqui_rate;          //aquisition rate in millis
-  float calib_multiplier;  //multiplier for calibration of analog sensor
   char ID[20];
+  taskid_t task_id;
+  
+  float threshold;          //threshold for sending LoRa message
+  float high_threshold;     //To be used as high threshold in case of rule with two thresholds
+  char ruleID[30];          //Saves the name of the rule used with the thresholds
+  
+  int aqui_rate;            //aquisition rate in millis
+  float calib_multiplier;   //multiplier for calibration of analog sensor
   
 } Sensor;
 
@@ -43,9 +51,68 @@ typedef struct {
 Sensor sensors[MAX_SENSORS];
 int deviceAmount = 0; //REVERT THIS VALUE TO 0 AFTER TESTING
 
+StaticJsonDocument<96> doc;
+
 void setup() {
   Serial.begin(9600);
   while (!Serial) { }
+
+  char json[200];
+  
+  //>->->->->->->->->->JSON Code<-<-<<-<-<-<-<-<-<-<
+  //This all will go on the loop section
+  // run code when we get json LoRa message from central
+  
+  doc["sensor"] = "dht11";
+  doc["aqui_rate"] = 8000;
+  doc["rules"][0] = "isBetweenThresholds";
+  doc["threshold"] = 55;
+  doc["high_threshold"] = 82;
+  
+  serializeJson(doc, json);
+
+  const char* sensor = doc["sensor"]; // "dht11"
+  int new_aqui_rate = doc["aqui_rate"]; // 8000
+  const char* rules_0 = doc["rules"][0]; // "isBetweenThresholds"
+  int threshold = doc["threshold"]; // 55
+  int high_threshold = doc["high_threshold"]; // 82
+
+
+  if ( isSensorConnected(sensor) ) {
+
+    int sensorNumber = getSensorNumber(sensor);
+    
+    
+    if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
+      
+      //change aquisition rate of this sensor
+      sensors[sensorNumber].aqui_rate = new_aqui_rate;
+
+      //TODO: write to flash memory the new aquisition rate and other settings
+      
+      
+      taskManager.cancelTask(sensors[sensorNumber].task_id);
+      auto task = new ExecWithParameter<int>(readSensor, sensorNumber);
+      sensors[sensorNumber].task_id = taskManager.scheduleFixedRate(sensors[sensorNumber].aqui_rate, task, TIME_MILLIS, true); 
+    }
+
+    if ( rules_0 != sensors[sensorNumber].ruleID ) {
+
+      //change rule of this sensor (Only for one rule per sensor)
+      strcpy(sensors[sensorNumber].ruleID, rules_0);
+      
+    }
+
+    if ( threshold != sensors[sensorNumber].threshold ) {
+      sensors[sensorNumber].threshold = threshold;
+    }
+
+    if ( high_threshold != sensors[sensorNumber].high_threshold ) {
+      sensors[sensorNumber].high_threshold = high_threshold;
+    }
+    
+  }
+//>->->->->->->->->->END OF JSON Code<-<-<<-<-<-<-<-<-<-<
   
   while (SearchAddress(addr)) { //This will reset the search after no more devices are found.
     deviceAmount++;
@@ -69,8 +136,6 @@ void setup() {
     Serial.print("Models: ");
     Serial.println(teds[i].model);
   }
-  
-
 
   //Setup each sensor
   for (int i=0; i<deviceAmount; i++) {
@@ -85,7 +150,9 @@ void setup() {
             Serial.println("No data in memory. Filling with defaults.");
 
             strcpy(sensors[i].ID, WATER_LVL_ID);
+            strcpy(sensors[i].ruleID, WATER_LVL_RULE_ID);
             sensors[i].threshold = WATER_LVL_THRESHOLD;
+            sensors[i].high_threshold = WATER_LVL_THRESH_HIGH;
             sensors[i].aqui_rate = WATER_LVL_AQUI_RATE;
             sensors[i].calib_multiplier = WATER_LVL_CALIB_MULT;
             sensors[i].valid = true;
@@ -104,7 +171,9 @@ void setup() {
             Serial.println("No data in memory. Filling with defaults.");
 
             strcpy(sensors[i].ID, TEMP_HUM_ID);
+            strcpy(sensors[i].ruleID, TEMP_HUM_RULE_ID);
             sensors[i].threshold = TEMP_HUM_THRESHOLD;
+            sensors[i].high_threshold = TEMP_HUM_THRESH_HIGH;
             sensors[i].aqui_rate = TEMP_HUM_AQUI_RATE;
             sensors[i].calib_multiplier = TEMP_HUM_CALIB_MULT;
             sensors[i].valid = true;
@@ -117,12 +186,14 @@ void setup() {
 
         case CO2_SENSOR:
           sensors[i] = co2Sensor.read();
-
+        
           if (sensors[i].valid == false) {
             Serial.println("No data in memory. Filling with defaults.");
 
             strcpy(sensors[i].ID, CO2_ID);
+            strcpy(sensors[i].ruleID, CO2_RULE_ID);
             sensors[i].threshold = CO2_THRESHOLD;
+            sensors[i].high_threshold = CO2_THRESH_HIGH;
             sensors[i].aqui_rate = CO2_AQUI_RATE;
             sensors[i].calib_multiplier = CO2_CALIB_MULT;
             sensors[i].valid = true;
@@ -135,12 +206,14 @@ void setup() {
 
         case SOUND_SENSOR:
           sensors[i] = soundSensor.read();
-
+        
           if (sensors[i].valid == false) {
             Serial.println("No data in memory. Filling with defaults.");
 
             strcpy(sensors[i].ID, SOUND_ID);
+            strcpy(sensors[i].ruleID, SOUND_RULE_ID);
             sensors[i].threshold = SOUND_THRESHOLD;
+            sensors[i].high_threshold = SOUND_THRESH_HIGH;
             sensors[i].aqui_rate = SOUND_AQUI_RATE;
             sensors[i].calib_multiplier = SOUND_CALIB_MULT;
             sensors[i].valid = true;
@@ -153,12 +226,14 @@ void setup() {
 
         case AMMONIA_SENSOR:
           sensors[i] = ammoniaSensor.read();
-
+        
           if (sensors[i].valid == false) {
             Serial.println("No data in memory. Filling with defaults.");
 
             strcpy(sensors[i].ID, AMMONIA_ID);
+            strcpy(sensors[i].ruleID, AMMONIA_RULE_ID);
             sensors[i].threshold = AMMONIA_THRESHOLD;
+            sensors[i].high_threshold = AMMONIA_THRESH_HIGH;
             sensors[i].aqui_rate = AMMONIA_AQUI_RATE;
             sensors[i].calib_multiplier = AMMONIA_CALIB_MULT;
             sensors[i].valid = true;
@@ -173,14 +248,14 @@ void setup() {
           break;
       }
     } else {
-      Serial.println("Sensor not supported");
+      Serial.println("Sensor not supported...Stopping");
       while (1) {};
     }
   }
   
   for (int i=0; i < deviceAmount; i++) {
     auto task = new ExecWithParameter<int>(readSensor, i);
-    taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
+    sensors[i].task_id = taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
   }
   
 }
@@ -212,8 +287,39 @@ void readSensor(int deviceNumber) {
   Serial.print(sensors[deviceNumber].ID);
   Serial.print(" - ");
   Serial.println(sensors[deviceNumber].calib_multiplier); 
+
+  //TODO: DO an analog read of the sensor (this is just template code)
+  //float reading = (float) analogRead(A3);
+
+  float reading = 500; //Delete this later, just for testing
+
+  //Convert reading to 0-100 scale
+  reading = reading / 10.23;
+  reading = reading * sensors[deviceNumber].calib_multiplier;
+
+  //Use the rule on the reading to determine if should send alert to cloud or not
+  if ( useRule(sensors[deviceNumber].ruleID, reading, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold) ) {
+
+    //send alert to cloud
+    //by setting upload flag to 1 and filling the data variable with the alert
+    //(this is on the other sleep_cycle code) 
+    
+  }
+  
   
 }
+
+boolean isSensorConnected(const char *sensor) {
+
+  return false;
+}
+
+int getSensorNumber(const char *sensor) {
+
+  
+  return -1;
+}
+
 
 void ReadAndSave()
 {
