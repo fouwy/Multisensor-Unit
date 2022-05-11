@@ -57,62 +57,6 @@ void setup() {
   Serial.begin(9600);
   while (!Serial) { }
 
-  char json[200];
-  
-  //>->->->->->->->->->JSON Code<-<-<<-<-<-<-<-<-<-<
-  //This all will go on the loop section
-  // run code when we get json LoRa message from central
-  
-  doc["sensor"] = "dht11";
-  doc["aqui_rate"] = 8000;
-  doc["rules"][0] = "isBetweenThresholds";
-  doc["threshold"] = 55;
-  doc["high_threshold"] = 82;
-  
-  serializeJson(doc, json);
-
-  const char* sensor = doc["sensor"]; // "dht11"
-  int new_aqui_rate = doc["aqui_rate"]; // 8000
-  const char* rules_0 = doc["rules"][0]; // "isBetweenThresholds"
-  int threshold = doc["threshold"]; // 55
-  int high_threshold = doc["high_threshold"]; // 82
-
-
-  if ( isSensorConnected(sensor) ) {
-
-    int sensorNumber = getSensorNumber(sensor);
-    
-    
-    if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
-      
-      //change aquisition rate of this sensor
-      sensors[sensorNumber].aqui_rate = new_aqui_rate;
-
-      //TODO: write to flash memory the new aquisition rate and other settings
-      
-      
-      taskManager.cancelTask(sensors[sensorNumber].task_id);
-      auto task = new ExecWithParameter<int>(readSensor, sensorNumber);
-      sensors[sensorNumber].task_id = taskManager.scheduleFixedRate(sensors[sensorNumber].aqui_rate, task, TIME_MILLIS, true); 
-    }
-
-    if ( rules_0 != sensors[sensorNumber].ruleID ) {
-
-      //change rule of this sensor (Only for one rule per sensor)
-      strcpy(sensors[sensorNumber].ruleID, rules_0);
-      
-    }
-
-    if ( threshold != sensors[sensorNumber].threshold ) {
-      sensors[sensorNumber].threshold = threshold;
-    }
-
-    if ( high_threshold != sensors[sensorNumber].high_threshold ) {
-      sensors[sensorNumber].high_threshold = high_threshold;
-    }
-    
-  }
-//>->->->->->->->->->END OF JSON Code<-<-<<-<-<-<-<-<-<-<
   
   while (SearchAddress(addr)) { //This will reset the search after no more devices are found.
     deviceAmount++;
@@ -257,6 +201,69 @@ void setup() {
     auto task = new ExecWithParameter<int>(readSensor, i);
     sensors[i].task_id = taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
   }
+
+    //>->->->->->->->->->JSON Code<-<-<<-<-<-<-<-<-<-<
+  //This all will go on the loop section
+  // run code when we get json LoRa message from central
+
+  char json[200];
+   
+  doc["sensor"] = "dht11";
+  doc["aqui_rate"] = 8000;
+  doc["rules"][0] = "isBetweenThresholds";
+  doc["threshold"] = 55;
+  doc["high_threshold"] = 82;
+  
+  serializeJson(doc, json);
+
+  const char* sensor = doc["sensor"]; // "dht11"
+  int new_aqui_rate = doc["aqui_rate"]; // 8000
+  const char* rules_0 = doc["rules"][0]; // "isBetweenThresholds"
+  int threshold = doc["threshold"]; // 55
+  int high_threshold = doc["high_threshold"]; // 82
+
+
+  if ( isSensorConnected(sensor) ) {
+
+    Serial.print("Sensor is connected: ");
+    Serial.println(sensor);
+    
+    int sensorNumber = getSensorNumber(sensor);
+    
+    
+    if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
+      
+      //change aquisition rate of this sensor
+      sensors[sensorNumber].aqui_rate = new_aqui_rate;
+
+      //TODO: write to flash memory the new aquisition rate and other settings
+      
+
+      //cancels the previous task and adds a new one with the new aquisition rate
+      taskManager.cancelTask(sensors[sensorNumber].task_id);
+      auto task = new ExecWithParameter<int>(readSensor, sensorNumber);
+      sensors[sensorNumber].task_id = taskManager.scheduleFixedRate(sensors[sensorNumber].aqui_rate, task, TIME_MILLIS, true); 
+
+      Serial.println("Changed aquisition rate!");
+    }
+
+    if ( rules_0 != sensors[sensorNumber].ruleID ) {
+
+      //change rule of this sensor (Only for one rule per sensor)
+      strcpy(sensors[sensorNumber].ruleID, rules_0);
+      
+    }
+
+    if ( threshold != sensors[sensorNumber].threshold ) {
+      sensors[sensorNumber].threshold = threshold;
+    }
+
+    if ( high_threshold != sensors[sensorNumber].high_threshold ) {
+      sensors[sensorNumber].high_threshold = high_threshold;
+    }
+    
+  }
+//>->->->->->->->->->END OF JSON Code<-<-<<-<-<-<-<-<-<-<
   
 }
 
@@ -286,7 +293,7 @@ void readSensor(int deviceNumber) {
   Serial.print("Toggle - ");
   Serial.print(sensors[deviceNumber].ID);
   Serial.print(" - ");
-  Serial.println(sensors[deviceNumber].calib_multiplier); 
+  Serial.println(sensors[deviceNumber].aqui_rate); 
 
   //TODO: DO an analog read of the sensor (this is just template code)
   //float reading = (float) analogRead(A3);
@@ -300,22 +307,46 @@ void readSensor(int deviceNumber) {
   //Use the rule on the reading to determine if should send alert to cloud or not
   if ( useRule(sensors[deviceNumber].ruleID, reading, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold) ) {
 
+    Serial.print("Rule activated! Rule: ");
     //send alert to cloud
     //by setting upload flag to 1 and filling the data variable with the alert
     //(this is on the other sleep_cycle code) 
     
+  } else {
+    Serial.print("Rule NOT activated! Rule: ");
   }
+  
+    Serial.print(sensors[deviceNumber].ruleID);
+    Serial.print(" Reading: ");
+    Serial.print(reading);
+    Serial.print(" Threshold(s): (1) ");
+    Serial.print(sensors[deviceNumber].threshold);
+    Serial.print(" (2) ");
+    Serial.print(sensors[deviceNumber].high_threshold);
+    Serial.println();
+    Serial.println();
   
   
 }
 
 boolean isSensorConnected(const char *sensor) {
 
+  for (int i=0; i < MAX_SENSORS; i++) {
+
+    if ( strcmp(sensors[i].ID, sensor) == 0 )
+      return true;
+  }
+  
   return false;
 }
 
 int getSensorNumber(const char *sensor) {
 
+  for (int i=0; i < deviceAmount; i++) {
+
+    if ( strcmp(sensors[i].ID, sensor) == 0 )
+      return i;
+  }
   
   return -1;
 }

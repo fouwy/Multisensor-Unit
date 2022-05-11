@@ -23,16 +23,16 @@ boolean isOutsideThresholds(float sensorValue, float thresh_low, float thresh_hi
 
 boolean useRule(char *ruleID, float sensorValue, float thresh, float thresh_high) {
 
-  if (ruleID == "isAboveThreshold")
+  if ( strcmp(ruleID, "isAboveThreshold") == 0 ) {
       return isAboveThreshold(sensorValue, thresh);
-      
-  else if (ruleID == "isBelowThreshold")
+  }
+  else if ( strcmp(ruleID, "isBelowThreshold") == 0 )
       return isBelowThreshold(sensorValue, thresh);
       
-  else if (ruleID == "isBetweenThresholds")
+  else if ( strcmp(ruleID, "isBetweenThresholds") == 0 )
       return isBetweenThresholds(sensorValue, thresh, thresh_high);
       
-  else if (ruleID == "isOutsideThresholds")
+  else if ( strcmp(ruleID, "isOutsideThresholds") == 0 )
       return isOutsideThresholds(sensorValue, thresh, thresh_high);
       
   else
