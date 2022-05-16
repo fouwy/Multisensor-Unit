@@ -20,8 +20,19 @@ boolean isOutsideThresholds(float sensorValue, float thresh_low, float thresh_hi
   return !( (sensorValue > thresh_low) && (sensorValue < thresh_high) );
 }
 
+boolean averageIsAboveThreshold(float *values, int buffer_size, float thresh) {
+  
+  return isAboveThreshold( getAverage(values, buffer_size), thresh );
+}
 
-boolean useRule(char *ruleID, float sensorValue, float thresh, float thresh_high) {
+boolean averageIsBelowThreshold(float *values, int buffer_size, float thresh) {
+  
+  return isBelowThreshold( getAverage(values, buffer_size), thresh );
+}
+
+boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, float thresh_high, int isBufferFull) {
+
+  float sensorValue = readings[0];
 
   if ( strcmp(ruleID, "isAboveThreshold") == 0 ) {
       return isAboveThreshold(sensorValue, thresh);
@@ -34,7 +45,33 @@ boolean useRule(char *ruleID, float sensorValue, float thresh, float thresh_high
       
   else if ( strcmp(ruleID, "isOutsideThresholds") == 0 )
       return isOutsideThresholds(sensorValue, thresh, thresh_high);
+
+  else if ( strncmp("average", ruleID, strlen("average")) == 0 ) {
+    if (isBufferFull) {
+
+      if ( strcmp(ruleID, "averageIsAboveThreshold") == 0 ) {
+        return averageIsAboveThreshold(readings, buffer_size, thresh);
+      }
+
+      if ( strcmp(ruleID, "averageIsBelowThreshold") == 0 ) {
+        return averageIsBelowThreshold(readings, buffer_size, thresh);
+      }
+      
+    } else {
+      return false;
+    }
+  }
       
   else
     return false;
+}
+
+float getAverage(float *values, int buffer_size) {
+  float average = values[0];
+  for (int i=1; i<buffer_size; i++) {
+      average += values[i];
+  }
+  average /= buffer_size;
+
+  return average;
 }

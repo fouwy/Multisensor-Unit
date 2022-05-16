@@ -9,6 +9,7 @@
 
 
 #define MAX_SENSORS 10
+#define READINGS_BUFF_SIZE 5 //Buffer size to store readings of each sensor
 
 OneWire  ds(8);    // 1-wire on pin 8
 byte     addr[8];  // Contains the eeprom unique ID
@@ -20,12 +21,16 @@ typedef struct {
   char ID[20];
   taskid_t task_id;
   
-  float threshold;          //threshold for sending LoRa message
-  float high_threshold;     //To be used as high threshold in case of rule with two thresholds
-  char ruleID[30];          //Saves the name of the rule used with the thresholds
+  float threshold;                      //threshold for sending LoRa message
+  float high_threshold;                 //To be used as high threshold in case of rule with two thresholds
+  char ruleID[30];                      //Saves the name of the rule used with the thresholds
   
-  int aqui_rate;            //aquisition rate in millis
-  float calib_multiplier;   //multiplier for calibration of analog sensor
+  float readings[READINGS_BUFF_SIZE] = {0};   //Stores the last "READINGS_BUFF_SIZE" readings of the sensor
+  int buffer_length = 0;
+  int write_index = 0;
+  
+  int aqui_rate;                        //aquisition rate in millis
+  float calib_multiplier;               //multiplier for calibration of analog sensor
   
 } Sensor;
 
@@ -202,6 +207,7 @@ void setup() {
     sensors[i].task_id = taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
   }
 
+  //taskManager.scheduleOnce(10000, jsonCode, TIME_MILLIS);
     //>->->->->->->->->->JSON Code<-<-<<-<-<-<-<-<-<-<
   //This all will go on the loop section
   // run code when we get json LoRa message from central
@@ -210,7 +216,7 @@ void setup() {
    
   doc["sensor"] = "dht11";
   doc["aqui_rate"] = 8000;
-  doc["rules"][0] = "isBetweenThresholds";
+  doc["rules"][0] = "averageIsAboveThreshold";
   doc["threshold"] = 55;
   doc["high_threshold"] = 82;
   
@@ -297,15 +303,35 @@ void readSensor(int deviceNumber) {
 
   //TODO: DO an analog read of the sensor (this is just template code)
   //float reading = (float) analogRead(A3);
-
+  int BUFFER_FULL_FLAG = 0;
+  
   float reading = 500; //Delete this later, just for testing
 
   //Convert reading to 0-100 scale
   reading = reading / 10.23;
   reading = reading * sensors[deviceNumber].calib_multiplier;
 
+
+  if ( sensors[deviceNumber].buffer_length < READINGS_BUFF_SIZE ) {
+    sensors[deviceNumber].buffer_length++;
+    
+  } else {
+    BUFFER_FULL_FLAG = 1;
+  }
+  
+  for (int i=0; i < sensors[deviceNumber].buffer_length; i++) {
+
+    if ( i == (READINGS_BUFF_SIZE-1) ) {  //To not cause buffer overflow
+      continue;
+    } else {
+      sensors[deviceNumber].readings[i+1] = sensors[deviceNumber].readings[i];
+    }
+  }
+
+  sensors[deviceNumber].readings[0] = reading;
+    
   //Use the rule on the reading to determine if should send alert to cloud or not
-  if ( useRule(sensors[deviceNumber].ruleID, reading, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold) ) {
+  if ( useRule(sensors[deviceNumber].ruleID, sensors[deviceNumber].readings, READINGS_BUFF_SIZE, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold, BUFFER_FULL_FLAG) ) {
 
     Serial.print("Rule activated! Rule: ");
     //send alert to cloud
