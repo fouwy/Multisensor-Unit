@@ -20,7 +20,7 @@ typedef struct {
   
   float readings[READINGS_BUFF_SIZE] = {0};   //Stores the last "READINGS_BUFF_SIZE" readings of the sensor
   int buffer_length = 0;
-  int write_index = 0;
+  boolean BUFFER_FULL_FLAG = false;
   
   int aqui_rate;                        //aquisition rate in millis
   float calib_multiplier;               //multiplier for calibration of analog sensor

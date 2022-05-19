@@ -13,9 +13,11 @@ boolean averageIsBelowThreshold(float *values, int buffer_size, float thresh);
 
 boolean averageIsAboveThreshold(float *values, int buffer_size, float thresh);
 
-boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, float thresh_high, int isBufferFull);
+boolean useRule(Sensor sensor);
 
-boolean useComplexRule(Sensor sensor);
+boolean useComplexRule(Sensor sensor, Sensor secondSensor); 
+
+boolean evaluateOperation(bool firstCondition, bool secondCondition, char *logicOperator);
 
 float getAverage(float *values, int buffer_size);
 

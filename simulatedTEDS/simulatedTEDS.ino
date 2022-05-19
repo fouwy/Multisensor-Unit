@@ -298,7 +298,6 @@ void readSensor(int deviceNumber) {
 
   //TODO: DO an analog read of the sensor (this is just template code)
   //float reading = (float) analogRead(A3);
-  int BUFFER_FULL_FLAG = 0;
   
   float reading = 500; //Delete this later, just for testing
 
@@ -311,7 +310,7 @@ void readSensor(int deviceNumber) {
     sensors[deviceNumber].buffer_length++;
     
   } else {
-    BUFFER_FULL_FLAG = 1;
+    sensors[deviceNumber].BUFFER_FULL_FLAG = true;
   }
   
   for (int i=0; i < sensors[deviceNumber].buffer_length; i++) {
@@ -329,12 +328,14 @@ void readSensor(int deviceNumber) {
   if ( sensors[deviceNumber].op != NULL ) {
 
     //TODO: get the other sensor info
-    if ( useComplexRule(sensors[deviceNumber]) ) {
+    int secondSensorNumber = getSensorNumber(sensors[deviceNumber].second_sensor);
+    
+    if ( useComplexRule(sensors[deviceNumber], sensors[secondSensorNumber]) ) {
       
     }
   }
   //Use the rule on the reading to determine if should send alert to cloud or not
-  else if ( useRule(sensors[deviceNumber].ruleID, sensors[deviceNumber].readings, READINGS_BUFF_SIZE, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold, BUFFER_FULL_FLAG) ) {
+  else if ( useRule(sensors[deviceNumber]) ) {
 
     Serial.print("Rule activated! Rule: ");
     //send alert to cloud

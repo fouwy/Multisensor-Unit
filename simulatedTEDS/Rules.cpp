@@ -31,10 +31,15 @@ boolean averageIsBelowThreshold(float *values, int buffer_size, float thresh) {
   return isBelowThreshold( getAverage(values, buffer_size), thresh );
 }
 
-boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, float thresh_high, int isBufferFull) {
+boolean useRule(Sensor sensor) {
 
-  float sensorValue = readings[0];
-
+  char *ruleID = sensor.ruleID;
+  float sensorValue = sensor.readings[0];
+  int buffer_size = READINGS_BUFF_SIZE;
+  float thresh = sensor.threshold;
+  float thresh_high = sensor.high_threshold;
+  boolean isBufferFull = sensor.BUFFER_FULL_FLAG;
+  
   if ( strcmp(ruleID, "isAboveThreshold") == 0 ) {
       return isAboveThreshold(sensorValue, thresh);
   }
@@ -50,6 +55,8 @@ boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, fl
   else if ( strncmp("average", ruleID, strlen("average")) == 0 ) {
     if (isBufferFull) {
 
+      float *readings = sensor.readings;
+      
       if ( strcmp(ruleID, "averageIsAboveThreshold") == 0 ) {
         return averageIsAboveThreshold(readings, buffer_size, thresh);
       }
@@ -67,12 +74,30 @@ boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, fl
     return false;
 }
 
-boolean useComplexRule(Sensor sensor) {
-  //TODO: -in the arguments we need the second sensor for its threshold and rule values
-  //      -do both rule checks
-  //      -use the operator to return true or false
+boolean useComplexRule(Sensor sensor, Sensor secondSensor) {
+  
+  boolean firstCondition = useRule(sensor);
+  boolean secondCondition = useRule(secondSensor);
+
+  return evaluateOperation(firstCondition, secondCondition, sensor.op);
 }
 
+boolean evaluateOperation(bool firstCondition, bool secondCondition, char *logicOperator) {
+
+  if      ( strcmp(logicOperator, "AND") == 0 ) {
+    return firstCondition && secondCondition; 
+  } 
+  else if ( strcmp(logicOperator, "OR") == 0 ) {
+    return firstCondition || secondCondition;  
+  }
+  else if ( strcmp(logicOperator, "XOR") == 0 ) {
+    return firstCondition ^ secondCondition;
+  }
+  else {
+    Serial.println("Operator not recognized");
+    return false;
+  }
+}
 
 float getAverage(float *values, int buffer_size) {
   float average = values[0];
