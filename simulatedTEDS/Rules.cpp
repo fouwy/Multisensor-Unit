@@ -1,5 +1,6 @@
 #include "Rules.h"
 
+
 boolean isAboveThreshold(float sensorValue, float thresh)
 {
   return (sensorValue > thresh);
@@ -65,6 +66,13 @@ boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, fl
   else
     return false;
 }
+
+boolean useComplexRule(Sensor sensor) {
+  //TODO: -in the arguments we need the second sensor for its threshold and rule values
+  //      -do both rule checks
+  //      -use the operator to return true or false
+}
+
 
 float getAverage(float *values, int buffer_size) {
   float average = values[0];

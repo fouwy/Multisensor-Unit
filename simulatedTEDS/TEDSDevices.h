@@ -2,6 +2,30 @@
 #define TEDSDevices_H
 
 #include <Arduino.h>
+#include <TaskManagerIO.h>
+
+#define READINGS_BUFF_SIZE 5 //Buffer size to store readings of each sensor
+
+typedef struct {
+  
+  boolean valid;
+  char ID[20];
+  taskid_t task_id;
+  
+  float threshold;                      //threshold for sending LoRa message
+  float high_threshold;                 //To be used as high threshold in case of rule with two thresholds
+  char ruleID[30];                      //Saves the name of the rule used with the thresholds
+  char op[3] = "";                      //Operator used for complex rules(AND, OR, ...)
+  char second_sensor[20];               //ID of the other sensor for the complex rule  
+  
+  float readings[READINGS_BUFF_SIZE] = {0};   //Stores the last "READINGS_BUFF_SIZE" readings of the sensor
+  int buffer_length = 0;
+  int write_index = 0;
+  
+  int aqui_rate;                        //aquisition rate in millis
+  float calib_multiplier;               //multiplier for calibration of analog sensor
+  
+} Sensor;
 
 #define WATER_LVL_SENSOR  0
 #define TEMP_HUM_SENSOR   1

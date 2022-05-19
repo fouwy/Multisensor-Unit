@@ -1,6 +1,7 @@
 #ifndef RULES_H
 #define RULES_H
 #include <Arduino.h>
+#include "TEDSDevices.h"
 
 boolean isAboveThreshold(float sensorValue, float thresh);
 
@@ -13,6 +14,8 @@ boolean averageIsBelowThreshold(float *values, int buffer_size, float thresh);
 boolean averageIsAboveThreshold(float *values, int buffer_size, float thresh);
 
 boolean useRule(char *ruleID, float *readings, int buffer_size, float thresh, float thresh_high, int isBufferFull);
+
+boolean useComplexRule(Sensor sensor);
 
 float getAverage(float *values, int buffer_size);
 

@@ -9,30 +9,10 @@
 
 
 #define MAX_SENSORS 10
-#define READINGS_BUFF_SIZE 5 //Buffer size to store readings of each sensor
 
 OneWire  ds(8);    // 1-wire on pin 8
 byte     addr[8];  // Contains the eeprom unique ID
 byte memory[128];
-
-typedef struct {
-  
-  boolean valid;
-  char ID[20];
-  taskid_t task_id;
-  
-  float threshold;                      //threshold for sending LoRa message
-  float high_threshold;                 //To be used as high threshold in case of rule with two thresholds
-  char ruleID[30];                      //Saves the name of the rule used with the thresholds
-  
-  float readings[READINGS_BUFF_SIZE] = {0};   //Stores the last "READINGS_BUFF_SIZE" readings of the sensor
-  int buffer_length = 0;
-  int write_index = 0;
-  
-  int aqui_rate;                        //aquisition rate in millis
-  float calib_multiplier;               //multiplier for calibration of analog sensor
-  
-} Sensor;
 
 //Flash memory space for sensors
 FlashStorage(waterSensor, Sensor);
@@ -212,13 +192,16 @@ void setup() {
   //This all will go on the loop section
   // run code when we get json LoRa message from central
 
-  char json[200];
+  char json[300];
    
   doc["sensor"] = "dht11";
   doc["aqui_rate"] = 8000;
   doc["rules"][0] = "averageIsAboveThreshold";
   doc["threshold"] = 55;
   doc["high_threshold"] = 82;
+  doc["operator"] = "AND";
+  doc["sensor2"] = "water";
+
   
   serializeJson(doc, json);
 
@@ -227,15 +210,17 @@ void setup() {
   const char* rules_0 = doc["rules"][0]; // "isBetweenThresholds"
   int threshold = doc["threshold"]; // 55
   int high_threshold = doc["high_threshold"]; // 82
-
-
+  const char* op = doc["operator"];
+  const char* second_sensor = doc["sensor2"];
+  
   if ( isSensorConnected(sensor) ) {
 
     Serial.print("Sensor is connected: ");
     Serial.println(sensor);
     
     int sensorNumber = getSensorNumber(sensor);
-    
+
+    //TODO: in every if(), check if json field is zero or NULL
     
     if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
       
@@ -266,6 +251,16 @@ void setup() {
 
     if ( high_threshold != sensors[sensorNumber].high_threshold ) {
       sensors[sensorNumber].high_threshold = high_threshold;
+    }
+
+    if (op != NULL) {
+
+        if ( isSensorConnected(second_sensor) ) {
+          strcpy(sensors[sensorNumber].second_sensor, second_sensor);
+
+          strcpy(sensors[sensorNumber].op, op);
+        }
+          
     }
     
   }
@@ -329,9 +324,17 @@ void readSensor(int deviceNumber) {
   }
 
   sensors[deviceNumber].readings[0] = reading;
-    
+
+  //Check if this sensor is using complex rule first
+  if ( sensors[deviceNumber].op != NULL ) {
+
+    //TODO: get the other sensor info
+    if ( useComplexRule(sensors[deviceNumber]) ) {
+      
+    }
+  }
   //Use the rule on the reading to determine if should send alert to cloud or not
-  if ( useRule(sensors[deviceNumber].ruleID, sensors[deviceNumber].readings, READINGS_BUFF_SIZE, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold, BUFFER_FULL_FLAG) ) {
+  else if ( useRule(sensors[deviceNumber].ruleID, sensors[deviceNumber].readings, READINGS_BUFF_SIZE, sensors[deviceNumber].threshold, sensors[deviceNumber].high_threshold, BUFFER_FULL_FLAG) ) {
 
     Serial.print("Rule activated! Rule: ");
     //send alert to cloud
