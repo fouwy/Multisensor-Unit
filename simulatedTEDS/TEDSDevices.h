@@ -15,8 +15,9 @@ typedef struct {
   float threshold;                      //threshold for sending LoRa message
   float high_threshold;                 //To be used as high threshold in case of rule with two thresholds
   char ruleID[30];                      //Saves the name of the rule used with the thresholds
-  char op[3] = "";                      //Operator used for complex rules(AND, OR, ...)
+  char op[4] = "";                      //Operator used for complex rules(AND, OR, ...)
   char second_sensor[20];               //ID of the other sensor for the complex rule  
+  boolean isSecondSensor = false;       //True when this sensor is part of a complex rule which another sensor is using
   
   float readings[READINGS_BUFF_SIZE] = {0};   //Stores the last "READINGS_BUFF_SIZE" readings of the sensor
   int buffer_length = 0;

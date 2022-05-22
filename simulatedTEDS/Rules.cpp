@@ -79,12 +79,19 @@ boolean useComplexRule(Sensor sensor, Sensor secondSensor) {
   boolean firstCondition = useRule(sensor);
   boolean secondCondition = useRule(secondSensor);
 
+  Serial.print("second sensor: ");
+  Serial.println(sensor.op);
+  Serial.print("first-");
+  Serial.println(firstCondition);
+  Serial.print("second-");
+  Serial.println(secondCondition);
   return evaluateOperation(firstCondition, secondCondition, sensor.op);
 }
 
 boolean evaluateOperation(bool firstCondition, bool secondCondition, char *logicOperator) {
 
   if      ( strcmp(logicOperator, "AND") == 0 ) {
+    Serial.println("here");
     return firstCondition && secondCondition; 
   } 
   else if ( strcmp(logicOperator, "OR") == 0 ) {

@@ -36,7 +36,7 @@ typedef struct {
 Sensor sensors[MAX_SENSORS];
 int deviceAmount = 0; //REVERT THIS VALUE TO 0 AFTER TESTING
 
-StaticJsonDocument<96> doc;
+StaticJsonDocument<128> doc;
 
 void setup() {
   Serial.begin(9600);
@@ -192,16 +192,15 @@ void setup() {
   //This all will go on the loop section
   // run code when we get json LoRa message from central
 
-  char json[300];
+  char json[200];
    
   doc["sensor"] = "dht11";
   doc["aqui_rate"] = 8000;
-  doc["rules"][0] = "averageIsAboveThreshold";
-  doc["threshold"] = 55;
+  doc["rules"][0] = "isAboveThreshold";
+  doc["threshold"] = 47;
   doc["high_threshold"] = 82;
-  doc["operator"] = "AND";
+  doc["logic_operator"] = "AND";
   doc["sensor2"] = "water";
-
   
   serializeJson(doc, json);
 
@@ -210,14 +209,16 @@ void setup() {
   const char* rules_0 = doc["rules"][0]; // "isBetweenThresholds"
   int threshold = doc["threshold"]; // 55
   int high_threshold = doc["high_threshold"]; // 82
-  const char* op = doc["operator"];
-  const char* second_sensor = doc["sensor2"];
-  
+  const char* op = doc["logic_operator"]; // "AND"
+  const char* second_sensor = doc["sensor2"]; // "water"
+    
   if ( isSensorConnected(sensor) ) {
 
     Serial.print("Sensor is connected: ");
     Serial.println(sensor);
-    
+
+    Serial.print("Second sensor: ");
+    Serial.println(second_sensor);
     int sensorNumber = getSensorNumber(sensor);
 
     //TODO: in every if(), check if json field is zero or NULL
@@ -252,17 +253,28 @@ void setup() {
     if ( high_threshold != sensors[sensorNumber].high_threshold ) {
       sensors[sensorNumber].high_threshold = high_threshold;
     }
+      
+    if ( strcmp(op, "") == 0 && strcmp(sensors[sensorNumber].op, "") != 0 ) {
+      //When changing back from complex rule to normal, correct also the second sensor
 
+      strcpy(sensors[sensorNumber].op, op);
+      strcpy(sensors[sensorNumber].second_sensor, "");
+      
+      sensors[getSensorNumber(sensors[sensorNumber].second_sensor)].isSecondSensor = false;
+    }
+    
     if (op != NULL) {
 
         if ( isSensorConnected(second_sensor) ) {
-          strcpy(sensors[sensorNumber].second_sensor, second_sensor);
 
+          Serial.println("Operator is not null");
+
+          sensors[getSensorNumber(second_sensor)].isSecondSensor = true;
+          
+          strcpy(sensors[sensorNumber].second_sensor, second_sensor);
           strcpy(sensors[sensorNumber].op, op);
         }
-          
     }
-    
   }
 //>->->->->->->->->->END OF JSON Code<-<-<<-<-<-<-<-<-<-<
   
@@ -293,6 +305,10 @@ void loop() {
 void readSensor(int deviceNumber) {
   Serial.print("Toggle - ");
   Serial.print(sensors[deviceNumber].ID);
+  Serial.print(" num - ");
+  Serial.print(deviceNumber);
+  Serial.print(" second sensor id ");
+  Serial.print(sensors[deviceNumber].second_sensor);
   Serial.print(" - ");
   Serial.println(sensors[deviceNumber].aqui_rate); 
 
@@ -324,14 +340,20 @@ void readSensor(int deviceNumber) {
 
   sensors[deviceNumber].readings[0] = reading;
 
+  //If this sensor is part of a complex rule, dont use its own rule now
+  if (sensors[deviceNumber].isSecondSensor) {
+    Serial.println("Is second sensor in complex rule");
+  }
+  
   //Check if this sensor is using complex rule first
-  if ( sensors[deviceNumber].op != NULL ) {
-
+  else if ( strcmp(sensors[deviceNumber].op, "") != 0 ) {
+    Serial.println("op is not null");
     //TODO: get the other sensor info
     int secondSensorNumber = getSensorNumber(sensors[deviceNumber].second_sensor);
+
     
     if ( useComplexRule(sensors[deviceNumber], sensors[secondSensorNumber]) ) {
-      
+      Serial.println("Complex rule active!");
     }
   }
   //Use the rule on the reading to determine if should send alert to cloud or not
