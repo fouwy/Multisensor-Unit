@@ -11,6 +11,7 @@ typedef struct {
   boolean valid;
   char ID[20];
   taskid_t task_id;
+  int pin;
   
   float threshold;                      //threshold for sending LoRa message
   float high_threshold;                 //To be used as high threshold in case of rule with two thresholds

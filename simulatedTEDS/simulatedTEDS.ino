@@ -7,10 +7,13 @@
 #include "Rules.h"
 #include <ArduinoJson.h>
 
-
 #define MAX_SENSORS 10
 
-OneWire  ds(8);    // 1-wire on pin 8
+const int selectPins[3] = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
+const int sensorMuxPin  = A0;  //Common output of multiplexer
+const int TEDSMuxPin    = 8;
+
+OneWire  ds(TEDSMuxPin);    // 1-wire on pin 8
 byte     addr[8];  // Contains the eeprom unique ID
 byte memory[128];
 
@@ -34,7 +37,7 @@ typedef struct {
 
 
 Sensor sensors[MAX_SENSORS];
-int deviceAmount = 0; //REVERT THIS VALUE TO 0 AFTER TESTING
+int deviceAmount = 0;
 
 StaticJsonDocument<128> doc;
 
@@ -42,9 +45,31 @@ void setup() {
   Serial.begin(9600);
   while (!Serial) { }
 
-  
-  while (SearchAddress(addr)) { //This will reset the search after no more devices are found.
-    deviceAmount++;
+  //Config multiplexers
+  for (int i=0; i<3; i++)
+  {
+    pinMode(selectPins[i], OUTPUT);
+    digitalWrite(selectPins[i], LOW);
+  }
+
+  BasicTEDS teds[deviceAmount];
+
+  for (int pin=0; pin<=7; pin++) {
+    
+    selectMuxPin(pin);
+
+    Serial.print("Pin "); Serial.print(pin); Serial.print(" --> ");
+    
+    if (SearchAddress(addr)) {
+
+      Serial.print("Found device on pin ");
+      Serial.println(pin);
+      ReadAndSave();
+      getBasicTEDS(teds[deviceAmount].man_ID, teds[deviceAmount].model, teds[deviceAmount].ver_letter, teds[deviceAmount].version, teds[deviceAmount].serial);
+      setupSensor(teds[deviceAmount], deviceAmount, pin);
+      
+      deviceAmount++;
+    }
   }
   
   if (deviceAmount == 0) {
@@ -54,133 +79,6 @@ void setup() {
 
   Serial.print("Device amount: ");
   Serial.println(deviceAmount);
-  
-  BasicTEDS teds[deviceAmount];
-  
-  for (int i=0; i<deviceAmount; i++) {
-    SearchAddress(addr);
-    ReadAndSave();
-    getBasicTEDS(teds[i].man_ID, teds[i].model, teds[i].ver_letter, teds[i].version, teds[i].serial);
-
-    Serial.print("Models: ");
-    Serial.println(teds[i].model);
-  }
-
-  //Setup each sensor
-  for (int i=0; i<deviceAmount; i++) {
-
-    if (teds[i].man_ID == 0) {
-      switch (teds[i].model) {
-        case WATER_LVL_SENSOR:
-          Serial.println("In water level sensor code");
-          sensors[i] = waterSensor.read();
-
-          if (sensors[i].valid == false) {
-            Serial.println("No data in memory. Filling with defaults.");
-
-            strcpy(sensors[i].ID, WATER_LVL_ID);
-            strcpy(sensors[i].ruleID, WATER_LVL_RULE_ID);
-            sensors[i].threshold = WATER_LVL_THRESHOLD;
-            sensors[i].high_threshold = WATER_LVL_THRESH_HIGH;
-            sensors[i].aqui_rate = WATER_LVL_AQUI_RATE;
-            sensors[i].calib_multiplier = WATER_LVL_CALIB_MULT;
-            sensors[i].valid = true;
-      
-            waterSensor.write(sensors[i]);
-          } else {
-            Serial.println("Data found in memory.");
-          }
-          break;
-
-        case TEMP_HUM_SENSOR:
-          Serial.println("In heat sensor code");
-          sensors[i] = heatSensor.read();
-
-          if (sensors[i].valid == false) {
-            Serial.println("No data in memory. Filling with defaults.");
-
-            strcpy(sensors[i].ID, TEMP_HUM_ID);
-            strcpy(sensors[i].ruleID, TEMP_HUM_RULE_ID);
-            sensors[i].threshold = TEMP_HUM_THRESHOLD;
-            sensors[i].high_threshold = TEMP_HUM_THRESH_HIGH;
-            sensors[i].aqui_rate = TEMP_HUM_AQUI_RATE;
-            sensors[i].calib_multiplier = TEMP_HUM_CALIB_MULT;
-            sensors[i].valid = true;
-      
-            heatSensor.write(sensors[i]);
-          } else {
-            Serial.println("Data found in memory.");
-          }
-          break;
-
-        case CO2_SENSOR:
-          sensors[i] = co2Sensor.read();
-        
-          if (sensors[i].valid == false) {
-            Serial.println("No data in memory. Filling with defaults.");
-
-            strcpy(sensors[i].ID, CO2_ID);
-            strcpy(sensors[i].ruleID, CO2_RULE_ID);
-            sensors[i].threshold = CO2_THRESHOLD;
-            sensors[i].high_threshold = CO2_THRESH_HIGH;
-            sensors[i].aqui_rate = CO2_AQUI_RATE;
-            sensors[i].calib_multiplier = CO2_CALIB_MULT;
-            sensors[i].valid = true;
-      
-            co2Sensor.write(sensors[i]);
-          } else {
-            Serial.println("Data found in memory.");
-          }
-          break;
-
-        case SOUND_SENSOR:
-          sensors[i] = soundSensor.read();
-        
-          if (sensors[i].valid == false) {
-            Serial.println("No data in memory. Filling with defaults.");
-
-            strcpy(sensors[i].ID, SOUND_ID);
-            strcpy(sensors[i].ruleID, SOUND_RULE_ID);
-            sensors[i].threshold = SOUND_THRESHOLD;
-            sensors[i].high_threshold = SOUND_THRESH_HIGH;
-            sensors[i].aqui_rate = SOUND_AQUI_RATE;
-            sensors[i].calib_multiplier = SOUND_CALIB_MULT;
-            sensors[i].valid = true;
-      
-            soundSensor.write(sensors[i]);
-          } else {
-            Serial.println("Data found in memory.");
-          }
-          break;
-
-        case AMMONIA_SENSOR:
-          sensors[i] = ammoniaSensor.read();
-        
-          if (sensors[i].valid == false) {
-            Serial.println("No data in memory. Filling with defaults.");
-
-            strcpy(sensors[i].ID, AMMONIA_ID);
-            strcpy(sensors[i].ruleID, AMMONIA_RULE_ID);
-            sensors[i].threshold = AMMONIA_THRESHOLD;
-            sensors[i].high_threshold = AMMONIA_THRESH_HIGH;
-            sensors[i].aqui_rate = AMMONIA_AQUI_RATE;
-            sensors[i].calib_multiplier = AMMONIA_CALIB_MULT;
-            sensors[i].valid = true;
-      
-            ammoniaSensor.write(sensors[i]);
-          } else {
-            Serial.println("Data found in memory.");
-          }
-          break;
-
-        default:
-          break;
-      }
-    } else {
-      Serial.println("Sensor not supported...Stopping");
-      while (1) {};
-    }
-  }
   
   for (int i=0; i < deviceAmount; i++) {
     auto task = new ExecWithParameter<int>(readSensor, i);
@@ -312,14 +210,16 @@ void readSensor(int deviceNumber) {
   Serial.print(" - ");
   Serial.println(sensors[deviceNumber].aqui_rate); 
 
-  //TODO: DO an analog read of the sensor (this is just template code)
-  //float reading = (float) analogRead(A3);
   
-  float reading = 500; //Delete this later, just for testing
+  float reading;
 
+  selectMuxPin(sensors[deviceNumber].pin);
+  reading = analogRead(sensorMuxPin);
+  
   //Convert reading to 0-100 scale
   reading = reading / 10.23;
-  reading = reading * sensors[deviceNumber].calib_multiplier;
+  
+  //reading = reading * sensors[deviceNumber].calib_multiplier;
 
 
   if ( sensors[deviceNumber].buffer_length < READINGS_BUFF_SIZE ) {
@@ -460,4 +360,136 @@ void getBasicTEDS(int& man_ID, int& model, int& ver_letter, int& version, int& s
   ver_letter = ( ( memory[4] & 0x03 ) << 3) | (memory[3] >> 5);
   version = memory[4] >> 2;
   serial = (memory[7] << 16) | (memory[6] << 8) | (memory[5]);
+}
+
+void setupSensor(BasicTEDS teds, int deviceNum, int pin) {
+
+    if (teds.man_ID == 0) {
+      
+      switch (teds.model) {
+        
+        case WATER_LVL_SENSOR:
+          Serial.println("In water level sensor code");
+          sensors[deviceNum] = waterSensor.read();
+
+          if (sensors[deviceNum].valid == false) {
+            Serial.println("No data in memory. Filling with defaults.");
+
+            strcpy(sensors[deviceNum].ID, WATER_LVL_ID);
+            strcpy(sensors[deviceNum].ruleID, WATER_LVL_RULE_ID);
+            sensors[deviceNum].threshold = WATER_LVL_THRESHOLD;
+            sensors[deviceNum].high_threshold = WATER_LVL_THRESH_HIGH;
+            sensors[deviceNum].aqui_rate = WATER_LVL_AQUI_RATE;
+            sensors[deviceNum].calib_multiplier = WATER_LVL_CALIB_MULT;
+            sensors[deviceNum].valid = true;
+      
+            waterSensor.write(sensors[deviceNum]);
+          } else {
+            Serial.println("Data found in memory.");
+          }
+          break;
+
+        case TEMP_HUM_SENSOR:
+          Serial.println("In heat sensor code");
+          sensors[deviceNum] = heatSensor.read();
+
+          if (sensors[deviceNum].valid == false) {
+            Serial.println("No data in memory. Filling with defaults.");
+
+            strcpy(sensors[deviceNum].ID, TEMP_HUM_ID);
+            strcpy(sensors[deviceNum].ruleID, TEMP_HUM_RULE_ID);
+            sensors[deviceNum].threshold = TEMP_HUM_THRESHOLD;
+            sensors[deviceNum].high_threshold = TEMP_HUM_THRESH_HIGH;
+            sensors[deviceNum].aqui_rate = TEMP_HUM_AQUI_RATE;
+            sensors[deviceNum].calib_multiplier = TEMP_HUM_CALIB_MULT;
+            sensors[deviceNum].valid = true;
+      
+            heatSensor.write(sensors[deviceNum]);
+          } else {
+            Serial.println("Data found in memory.");
+          }
+          break;
+
+        case CO2_SENSOR:
+          sensors[deviceNum] = co2Sensor.read();
+        
+          if (sensors[deviceNum].valid == false) {
+            Serial.println("No data in memory. Filling with defaults.");
+
+            strcpy(sensors[deviceNum].ID, CO2_ID);
+            strcpy(sensors[deviceNum].ruleID, CO2_RULE_ID);
+            sensors[deviceNum].threshold = CO2_THRESHOLD;
+            sensors[deviceNum].high_threshold = CO2_THRESH_HIGH;
+            sensors[deviceNum].aqui_rate = CO2_AQUI_RATE;
+            sensors[deviceNum].calib_multiplier = CO2_CALIB_MULT;
+            sensors[deviceNum].valid = true;
+      
+            co2Sensor.write(sensors[deviceNum]);
+          } else {
+            Serial.println("Data found in memory.");
+          }
+          break;
+
+        case SOUND_SENSOR:
+          sensors[deviceNum] = soundSensor.read();
+        
+          if (sensors[deviceNum].valid == false) {
+            Serial.println("No data in memory. Filling with defaults.");
+
+            strcpy(sensors[deviceNum].ID, SOUND_ID);
+            strcpy(sensors[deviceNum].ruleID, SOUND_RULE_ID);
+            sensors[deviceNum].threshold = SOUND_THRESHOLD;
+            sensors[deviceNum].high_threshold = SOUND_THRESH_HIGH;
+            sensors[deviceNum].aqui_rate = SOUND_AQUI_RATE;
+            sensors[deviceNum].calib_multiplier = SOUND_CALIB_MULT;
+            sensors[deviceNum].valid = true;
+      
+            soundSensor.write(sensors[deviceNum]);
+          } else {
+            Serial.println("Data found in memory.");
+          }
+          break;
+
+        case AMMONIA_SENSOR:
+          sensors[deviceNum] = ammoniaSensor.read();
+        
+          if (sensors[deviceNum].valid == false) {
+            Serial.println("No data in memory. Filling with defaults.");
+
+            strcpy(sensors[deviceNum].ID, AMMONIA_ID);
+            strcpy(sensors[deviceNum].ruleID, AMMONIA_RULE_ID);
+            sensors[deviceNum].threshold = AMMONIA_THRESHOLD;
+            sensors[deviceNum].high_threshold = AMMONIA_THRESH_HIGH;
+            sensors[deviceNum].aqui_rate = AMMONIA_AQUI_RATE;
+            sensors[deviceNum].calib_multiplier = AMMONIA_CALIB_MULT;
+            sensors[deviceNum].valid = true;
+      
+            ammoniaSensor.write(sensors[deviceNum]);
+          } else {
+            Serial.println("Data found in memory.");
+          }
+          break;
+
+        default:
+          break;
+      }
+
+      sensors[deviceNum].pin = pin;
+      
+    } else {
+      Serial.println("Sensor not supported...Stopping");
+      while (1) {};
+    }
+}
+
+void selectMuxPin(byte pin)
+{
+  if (pin > 7) return; // Exit if pin is out of scope
+  for (int i=0; i<3; i++)
+  {
+    if (pin & (1<<i))
+      digitalWrite(selectPins[i], HIGH);
+    else
+      digitalWrite(selectPins[i], LOW);
+  }
 }
