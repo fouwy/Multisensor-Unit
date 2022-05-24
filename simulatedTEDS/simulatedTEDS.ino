@@ -9,9 +9,11 @@
 
 #define MAX_SENSORS 10
 
-const int selectPins[3] = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
-const int sensorMuxPin  = A0;  //Common output of multiplexer
-const int TEDSMuxPin    = 8;
+const int selectPins[3]   = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
+const int sensorMuxPin    = A0;  //Common output of multiplexer
+const int TEDSMuxPin      = 8;
+const int sensorEnablePin = 1;   //Enable pin for the multiplexer 
+const int TEDSEnablePin   = 0;
 
 OneWire  ds(TEDSMuxPin);    // 1-wire on pin 8
 byte     addr[8];  // Contains the eeprom unique ID
@@ -51,11 +53,14 @@ void setup() {
     pinMode(selectPins[i], OUTPUT);
     digitalWrite(selectPins[i], LOW);
   }
+  pinMode(sensorEnablePin, OUTPUT);
+  pinMode(TEDSEnablePin, OUTPUT);
+  digitalWrite(sensorEnablePin, LOW);
+  digitalWrite(TEDSEnablePin, LOW);
 
   BasicTEDS teds[MAX_SENSORS];
 
-  int pin = 0;
-  for (pin=0; pin < 8; pin++) {
+  for (int pin=0; pin < 8; pin++) {
     
     selectMuxPin(pin);
 
@@ -69,7 +74,6 @@ void setup() {
       
       Serial.print("Found device on pin ");
       Serial.print(pin);
-      delay(10);
       Serial.print(" -> Sensor: ");
       Serial.println(sensors[deviceAmount].ID);
       
@@ -77,7 +81,9 @@ void setup() {
     }
     delay(100);
   }
-  
+
+  changeMuxState(TEDSEnablePin, HIGH);  //disable TEDS mux, no longer needed
+ 
   if (deviceAmount == 0) {
     Serial.println("No TEDS device connected. Stopping...");
     while (1) {}
@@ -223,7 +229,9 @@ void readSensor(int deviceNumber) {
   
   float reading;
 
+  changeMuxState(sensorEnablePin, LOW);
   selectMuxPin(sensors[deviceNumber].pin);
+  
   reading = analogRead(sensorMuxPin);
   
   //Convert reading to 0-100 scale
@@ -288,7 +296,8 @@ void readSensor(int deviceNumber) {
     Serial.println();
     Serial.println();
   
-  
+
+  changeMuxState(sensorEnablePin, HIGH);
 }
 
 boolean isSensorConnected(const char *sensor) {
@@ -502,4 +511,9 @@ void selectMuxPin(byte pin)
     else
       digitalWrite(selectPins[i], LOW);
   }
+}
+
+void changeMuxState(int enableMuxPin, int state) {
+  
+  digitalWrite(enableMuxPin, state);
 }
