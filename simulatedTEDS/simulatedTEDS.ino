@@ -52,9 +52,10 @@ void setup() {
     digitalWrite(selectPins[i], LOW);
   }
 
-  BasicTEDS teds[deviceAmount];
+  BasicTEDS teds[MAX_SENSORS];
 
-  for (int pin=0; pin<=7; pin++) {
+  int pin = 0;
+  for (pin=0; pin < 8; pin++) {
     
     selectMuxPin(pin);
 
@@ -62,14 +63,19 @@ void setup() {
     
     if (SearchAddress(addr)) {
 
-      Serial.print("Found device on pin ");
-      Serial.println(pin);
       ReadAndSave();
       getBasicTEDS(teds[deviceAmount].man_ID, teds[deviceAmount].model, teds[deviceAmount].ver_letter, teds[deviceAmount].version, teds[deviceAmount].serial);
       setupSensor(teds[deviceAmount], deviceAmount, pin);
       
+      Serial.print("Found device on pin ");
+      Serial.print(pin);
+      delay(10);
+      Serial.print(" -> Sensor: ");
+      Serial.println(sensors[deviceAmount].ID);
+      
       deviceAmount++;
     }
+    delay(100);
   }
   
   if (deviceAmount == 0) {
@@ -155,6 +161,8 @@ void setup() {
     if ( strcmp(op, "") == 0 && strcmp(sensors[sensorNumber].op, "") != 0 ) {
       //When changing back from complex rule to normal, correct also the second sensor
 
+      Serial.println("changing back to simple rules");
+      
       strcpy(sensors[sensorNumber].op, op);
       strcpy(sensors[sensorNumber].second_sensor, "");
       
@@ -163,9 +171,11 @@ void setup() {
     
     if (op != NULL) {
 
+        Serial.println("op not null");
+        
         if ( isSensorConnected(second_sensor) ) {
 
-          Serial.println("Operator is not null");
+          Serial.println("second_sensor connected");
 
           sensors[getSensorNumber(second_sensor)].isSecondSensor = true;
           
