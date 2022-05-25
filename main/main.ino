@@ -16,7 +16,7 @@ int DOWNLINK_FLAG = 0; //True when there is a downlink LoRa msg pending
 LoRaModem modem;
 const char* appEui = "0000000000000000"; 
 const char* appKey = "FB6DDF75D139AEC02424D78F1DE3DCCD"; 
-char message[64] = ""; // LoRa Packet Content
+char message[200] = ""; // LoRa Packet Content
 
 //Multiplexer pins
 const int selectPins[3]   = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
@@ -117,101 +117,6 @@ void setup() {
     auto task = new ExecWithParameter<int>(readSensor, i);
     sensors[i].task_id = taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
   }
-
-  //taskManager.scheduleOnce(10000, jsonCode, TIME_MILLIS);
-    //>->->->->->->->->->JSON Code<-<-<<-<-<-<-<-<-<-<
-  //This all will go on the loop section
-  // run code when we get json LoRa message from central
-
-  char json[200];
-   
-  doc["sensor"] = "dht11";
-  doc["aqui_rate"] = 8000;
-  doc["rules"][0] = "isAboveThreshold";
-  doc["threshold"] = 47;
-  doc["high_threshold"] = 82;
-  doc["logic_operator"] = "AND";
-  doc["sensor2"] = "water";
-  
-  serializeJson(doc, json);
-
-  const char* sensor = doc["sensor"]; // "dht11"
-  int new_aqui_rate = doc["aqui_rate"]; // 8000
-  const char* rules_0 = doc["rules"][0]; // "isBetweenThresholds"
-  int threshold = doc["threshold"]; // 55
-  int high_threshold = doc["high_threshold"]; // 82
-  const char* op = doc["logic_operator"]; // "AND"
-  const char* second_sensor = doc["sensor2"]; // "water"
-    
-  if ( isSensorConnected(sensor) ) {
-
-    Serial.print("Sensor is connected: ");
-    Serial.println(sensor);
-
-    Serial.print("Second sensor: ");
-    Serial.println(second_sensor);
-    int sensorNumber = getSensorNumber(sensor);
-
-    //TODO: in every if(), check if json field is zero or NULL
-    
-    if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
-      
-      //change aquisition rate of this sensor
-      sensors[sensorNumber].aqui_rate = new_aqui_rate;
-
-      //TODO: write to flash memory the new aquisition rate and other settings
-      
-
-      //cancels the previous task and adds a new one with the new aquisition rate
-      taskManager.cancelTask(sensors[sensorNumber].task_id);
-      auto task = new ExecWithParameter<int>(readSensor, sensorNumber);
-      sensors[sensorNumber].task_id = taskManager.scheduleFixedRate(sensors[sensorNumber].aqui_rate, task, TIME_MILLIS, true); 
-
-      Serial.println("Changed aquisition rate!");
-    }
-
-    if ( rules_0 != sensors[sensorNumber].ruleID ) {
-
-      //change rule of this sensor (Only for one rule per sensor)
-      strcpy(sensors[sensorNumber].ruleID, rules_0);
-      
-    }
-
-    if ( threshold != sensors[sensorNumber].threshold ) {
-      sensors[sensorNumber].threshold = threshold;
-    }
-
-    if ( high_threshold != sensors[sensorNumber].high_threshold ) {
-      sensors[sensorNumber].high_threshold = high_threshold;
-    }
-      
-    if ( strcmp(op, "") == 0 && strcmp(sensors[sensorNumber].op, "") != 0 ) {
-      //When changing back from complex rule to normal, correct also the second sensor
-
-      Serial.println("changing back to simple rules");
-      
-      strcpy(sensors[sensorNumber].op, op);
-      strcpy(sensors[sensorNumber].second_sensor, "");
-      
-      sensors[getSensorNumber(sensors[sensorNumber].second_sensor)].isSecondSensor = false;
-    }
-    
-    if (op != NULL) {
-
-        Serial.println("op not null");
-        
-        if ( isSensorConnected(second_sensor) ) {
-
-          Serial.println("second_sensor connected");
-
-          sensors[getSensorNumber(second_sensor)].isSecondSensor = true;
-          
-          strcpy(sensors[sensorNumber].second_sensor, second_sensor);
-          strcpy(sensors[sensorNumber].op, op);
-        }
-    }
-  }
-//>->->->->->->->->->END OF JSON Code<-<-<<-<-<-<-<-<-<-<
   
 }
 
@@ -547,7 +452,7 @@ void LoRaPacketSender() {
   int err;
 
   modem.beginPacket();
-  modem.write(message);
+  modem.print("hi");
   err = modem.endPacket(false);
 
   if (err > 0) {
@@ -555,5 +460,117 @@ void LoRaPacketSender() {
   } else {
     Serial.println("Error sending message :(");
   }
+
+  if (!modem.available()) {
+    Serial.println("No downlink message received at this time.");
+  }
+  else  {
+    LoRaPacketReceiver();
+  }
+}
+
+void LoRaPacketReceiver() {
+  char rcv[200];
+  int i = 0;
+  while (modem.available()) {
+    rcv[i++] = (char)modem.read();
+  }
+  Serial.print("Received: ");
+  for (unsigned int j = 0; j < i; j++) {
+    Serial.print(rcv[j] >> 4, HEX);
+    Serial.print(rcv[j] & 0xF, HEX);
+    Serial.print(" ");
+    message[j] = rcv[j];
+  }
+  Serial.println();
+
+  DOWNLINK_FLAG = 1;
+  taskManager.execute([] {
+        processJSON(message);
+    });
   
+}
+
+void processJSON(char * message) {
+  StaticJsonDocument<200> doc;
+  deserializeMsgPack(doc, message);
+  serializeJson(doc, Serial);
+  Serial.println();
+
+  const char* sensor = doc["sensor"];
+  int new_aqui_rate = doc["aqui_rate"];
+  const char* rule = doc["rule"];
+  int threshold = doc["thresh"];
+  int high_threshold = doc["h_thresh"];
+  const char* op = doc["op"];
+  const char* second_sensor = doc["sensor2"]; 
+  
+  if ( isSensorConnected(sensor) ) {
+
+    Serial.print("Sensor is connected: ");
+    Serial.println(sensor);
+
+    Serial.print("Second sensor: ");
+    Serial.println(second_sensor);
+    int sensorNumber = getSensorNumber(sensor);
+
+    //TODO: in every if(), check if json field is zero or NULL
+    
+    if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
+      
+      //change aquisition rate of this sensor
+      sensors[sensorNumber].aqui_rate = new_aqui_rate;
+
+      //TODO: write to flash memory the new aquisition rate and other settings
+      
+
+      //cancels the previous task and adds a new one with the new aquisition rate
+      taskManager.cancelTask(sensors[sensorNumber].task_id);
+      auto task = new ExecWithParameter<int>(readSensor, sensorNumber);
+      sensors[sensorNumber].task_id = taskManager.scheduleFixedRate(sensors[sensorNumber].aqui_rate, task, TIME_MILLIS, true); 
+
+      Serial.println("Changed aquisition rate!");
+    }
+
+    if ( rule != sensors[sensorNumber].ruleID ) {
+
+      //change rule of this sensor (Only for one rule per sensor)
+      strcpy(sensors[sensorNumber].ruleID, rule);
+      
+    }
+
+    if ( threshold != sensors[sensorNumber].threshold ) {
+      sensors[sensorNumber].threshold = threshold;
+    }
+
+    if ( high_threshold != sensors[sensorNumber].high_threshold ) {
+      sensors[sensorNumber].high_threshold = high_threshold;
+    }
+      
+    if ( strcmp(op, "") == 0 && strcmp(sensors[sensorNumber].op, "") != 0 ) {
+      //When changing back from complex rule to normal, correct also the second sensor
+
+      Serial.println("changing back to simple rules");
+      
+      strcpy(sensors[sensorNumber].op, op);
+      strcpy(sensors[sensorNumber].second_sensor, "");
+      
+      sensors[getSensorNumber(sensors[sensorNumber].second_sensor)].isSecondSensor = false;
+    }
+    
+    if (op != NULL) {
+
+        Serial.println("op not null");
+        
+        if ( isSensorConnected(second_sensor) ) {
+
+          Serial.println("second_sensor connected");
+
+          sensors[getSensorNumber(second_sensor)].isSecondSensor = true;
+          
+          strcpy(sensors[sensorNumber].second_sensor, second_sensor);
+          strcpy(sensors[sensorNumber].op, op);
+        }
+    }
+  }
 }
