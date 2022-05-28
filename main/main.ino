@@ -498,7 +498,7 @@ void processJSON(char * message) {
   Serial.println();
 
   const char* sensor = doc["sensor"];
-  int new_aqui_rate = doc["aqui_rate"];
+  int aqui_rate = doc["aqui_rate"];
   const char* rule = doc["rule"];
   int threshold = doc["thresh"];
   int high_threshold = doc["h_thresh"];
@@ -516,10 +516,10 @@ void processJSON(char * message) {
 
     //TODO: in every if(), check if json field is zero or NULL
     
-    if ( new_aqui_rate != sensors[sensorNumber].aqui_rate ) {
+    if ( aqui_rate != sensors[sensorNumber].aqui_rate && aqui_rate != 0) {
       
       //change aquisition rate of this sensor
-      sensors[sensorNumber].aqui_rate = new_aqui_rate;
+      sensors[sensorNumber].aqui_rate = aqui_rate;
 
       //TODO: write to flash memory the new aquisition rate and other settings
       
@@ -532,19 +532,19 @@ void processJSON(char * message) {
       Serial.println("Changed aquisition rate!");
     }
 
-    if ( rule != sensors[sensorNumber].ruleID ) {
+    if ( rule != sensors[sensorNumber].ruleID && rule != NULL) {
 
       //change rule of this sensor (Only for one rule per sensor)
       strcpy(sensors[sensorNumber].ruleID, rule);
+
+      if ( threshold != sensors[sensorNumber].threshold ) {
+        sensors[sensorNumber].threshold = threshold;
+      }
+
+      if ( high_threshold != sensors[sensorNumber].high_threshold ) {
+        sensors[sensorNumber].high_threshold = high_threshold;
+      }
       
-    }
-
-    if ( threshold != sensors[sensorNumber].threshold ) {
-      sensors[sensorNumber].threshold = threshold;
-    }
-
-    if ( high_threshold != sensors[sensorNumber].high_threshold ) {
-      sensors[sensorNumber].high_threshold = high_threshold;
     }
       
     if ( strcmp(op, "") == 0 && strcmp(sensors[sensorNumber].op, "") != 0 ) {
