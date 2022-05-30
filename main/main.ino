@@ -8,22 +8,29 @@
 #include <ArduinoJson.h>
 // LoRa Library
 #include <MKRWAN.h>
+//Digital Sensors Libraries
+#include "DHT.h"
 
 #define MAX_SENSORS 10
 
 //LoRa Stuff
-int DOWNLINK_FLAG = 0; //True when there is a downlink LoRa msg pending
 LoRaModem modem;
 const char* appEui = "0000000000000000"; 
 const char* appKey = "FB6DDF75D139AEC02424D78F1DE3DCCD"; 
 char message[200] = ""; // LoRa Packet Content
 
 //Multiplexer pins
-const int selectPins[3]   = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
-const int sensorMuxPin    = A0;  //Common output of multiplexer
-const int TEDSMuxPin      = 8;
-const int sensorEnablePin = 1;   //Enable pin for the multiplexer 
-const int TEDSEnablePin   = 0;
+const int selectPins[3]           = {2, 3, 4};  // S-pins to Arduino pins: S0~2, S1~3, S2~4
+const int sensorMuxPin            = A0;  //Common output of multiplexer
+const int digitalSensorMuxPin     = 10;
+const int TEDSMuxPin              = 8;
+const int sensorEnablePin         = 1;   //Enable pin for the multiplexer
+const int digitalSensorEnablePin  = 5;
+const int TEDSEnablePin           = 0;
+
+//Digital sensors setup
+DHT dht(digitalSensorMuxPin, DHT11);
+
 //TEDS chip
 OneWire  ds(TEDSMuxPin);    // 1-wire pin
 byte     addr[8];  // Contains the eeprom unique ID
@@ -35,6 +42,7 @@ FlashStorage(heatSensor, Sensor);   //This is temp+hum sensor
 FlashStorage(co2Sensor, Sensor);
 FlashStorage(soundSensor, Sensor);
 FlashStorage(ammoniaSensor, Sensor);
+FlashStorage(dht11Sensor, Sensor);
 
 typedef struct {
   
@@ -48,8 +56,6 @@ typedef struct {
 
 Sensor sensors[MAX_SENSORS];
 int deviceAmount = 0;
-
-StaticJsonDocument<128> doc;
 
 void setup() {
   Serial.begin(9600);
@@ -100,7 +106,7 @@ void setup() {
       
       deviceAmount++;
     }
-    delay(100);
+    delay(200);
   }
 
   changeMuxState(TEDSEnablePin, HIGH);  //disable TEDS mux, no longer needed
@@ -155,16 +161,20 @@ void readSensor(int deviceNumber) {
   
   float reading;
 
-  changeMuxState(sensorEnablePin, LOW);
+  //TODO: read digital sensor
+
   selectMuxPin(sensors[deviceNumber].pin);
   
-  reading = analogRead(sensorMuxPin);
-  
-  //Convert reading to 0-100 scale
-  reading = reading / 10.23;
-  
-  //reading = reading * sensors[deviceNumber].calib_multiplier;
-
+  if (sensors[deviceNumber].calib_multiplier == 0) {  //Means sensor is digital
+    changeMuxState(digitalSensorEnablePin, LOW);
+    reading = readDigitalSensor(sensors[deviceNumber].ID);
+  } 
+  else {
+    changeMuxState(sensorEnablePin, LOW);
+    reading = analogRead(sensorMuxPin);
+    reading = reading / 10.23;
+    //reading = reading * sensors[deviceNumber].calib_multiplier;
+  }
 
   if ( sensors[deviceNumber].buffer_length < READINGS_BUFF_SIZE ) {
     sensors[deviceNumber].buffer_length++;
@@ -206,8 +216,6 @@ void readSensor(int deviceNumber) {
   else if ( useRule(sensors[deviceNumber]) ) {
 
     Serial.print("Rule activated! Rule: ");
-    //send alert to cloud
-    //by setting upload flag to 1 and filling the data variable with the alert
     
     LoRaPacketSender();
     
@@ -227,6 +235,7 @@ void readSensor(int deviceNumber) {
   
 
   changeMuxState(sensorEnablePin, HIGH);
+  changeMuxState(digitalSensorEnablePin, HIGH);
 }
 
 boolean isSensorConnected(const char *sensor) {
@@ -312,7 +321,7 @@ void getBasicTEDS(int& man_ID, int& model, int& ver_letter, int& version, int& s
 
 void setupSensor(BasicTEDS teds, int deviceNum, int pin) {
 
-    if (teds.man_ID == 0) {
+    if (teds.man_ID == 0) {   //This is an analog sensor
       
       switch (teds.model) {
         
@@ -424,7 +433,37 @@ void setupSensor(BasicTEDS teds, int deviceNum, int pin) {
 
       sensors[deviceNum].pin = pin;
       
-    } else {
+    } 
+    else if (teds.man_ID == 1) {  //This is a digital sensor
+      switch (teds.model) {
+        case DHT11_SENSOR:
+          dht.begin();
+          sensors[deviceNum] = dht11Sensor.read();
+        
+          if (sensors[deviceNum].valid == false) {
+            Serial.println("No data in memory. Filling with defaults.");
+
+            strcpy(sensors[deviceNum].ID, DHT11_ID);
+            strcpy(sensors[deviceNum].ruleID, DHT11_RULE_ID);
+            sensors[deviceNum].threshold = DHT11_THRESHOLD;
+            sensors[deviceNum].high_threshold = DHT11_THRESH_HIGH;
+            sensors[deviceNum].aqui_rate = DHT11_AQUI_RATE;
+            sensors[deviceNum].calib_multiplier = 0;                //Calib multiplier at zero means its digital sensor
+            sensors[deviceNum].valid = true; 
+
+            dht11Sensor.write(sensors[deviceNum]);
+          } else {
+            Serial.println("Data found in memory.");
+          }
+          break;
+
+        default:
+          break;
+      }
+      
+       sensors[deviceNum].pin = pin;
+    } 
+    else {
       Serial.println("Sensor not supported...Stopping");
       while (1) {};
     }
@@ -484,7 +523,6 @@ void LoRaPacketReceiver() {
   }
   Serial.println();
 
-  DOWNLINK_FLAG = 1;
   taskManager.execute([] {
         processJSON(message);
     });
@@ -573,4 +611,19 @@ void processJSON(char * message) {
         }
     }
   }
+}
+
+float readDigitalSensor(char *sensorName) {
+
+  if ( strcmp(sensorName, DHT11_ID) == 0 ) {
+
+    Serial.println("in read digital sensor");
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+    float hic = dht.computeHeatIndex(t, h, false);
+
+    return hic;
+  }
+
+  
 }

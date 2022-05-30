@@ -29,11 +29,23 @@ typedef struct {
   
 } Sensor;
 
+//Analog sensors
 #define WATER_LVL_SENSOR  0
 #define TEMP_HUM_SENSOR   1
 #define CO2_SENSOR        2
 #define SOUND_SENSOR      3
 #define AMMONIA_SENSOR    4
+
+//Digital sensors
+#define DHT11_SENSOR      0
+
+//DHT11 Sensor defaults (no calibration required)
+#define DHT11_ID            "dht11"
+#define DHT11_THRESHOLD     40
+#define DHT11_THRESH_HIGH   60
+#define DHT11_AQUI_RATE     8000
+#define DHT11_RULE_ID       "isAboveThreshold"
+
 
 //WATER LEVEL SENSOR Defaults
 #define WATER_LVL_ID          "water"
@@ -44,7 +56,7 @@ typedef struct {
 #define WATER_LVL_RULE_ID     "isAboveThreshold"
 
 //TEMP_HUM SENSOR Defaults
-#define TEMP_HUM_ID           "dht11"
+#define TEMP_HUM_ID           "heat"
 #define TEMP_HUM_THRESHOLD    20
 #define TEMP_HUM_THRESH_HIGH   60
 #define TEMP_HUM_AQUI_RATE    10000
