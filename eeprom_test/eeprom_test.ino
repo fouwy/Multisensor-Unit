@@ -2,7 +2,7 @@
 
 #define MAX_SENSORS 10
 
-OneWire  ds(8);    // 1-wire on pin 2
+OneWire  ds(14);    // 1-wire on pin 2
 byte     addr[8];  // Contains the eeprom unique ID
 byte memory[128];
 
@@ -34,8 +34,8 @@ void setup() {
 
   byte dat[13];
   
-  dat[0] = 0x00;
-  dat[1] = 0x40;
+  dat[0] = 0x01;
+  dat[1] = 0x00;
   dat[2] = 0x00;
   dat[3] = 0x00;
   dat[4] = 0x00;
