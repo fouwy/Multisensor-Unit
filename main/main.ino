@@ -57,10 +57,15 @@ typedef struct {
 Sensor sensors[MAX_SENSORS];
 int deviceAmount = 0;
 
+//Sleep indicator LED
+const int LEDPin = 14;
+
 void setup() {
   Serial.begin(9600);
   while (!Serial) { }
 
+  pinMode(LEDPin, OUTPUT);  //LED Sleep Mode Indicator 
+  
   if (!modem.begin(EU868)) {
     Serial.println("Failed to start module");
     while (1) {}
@@ -123,7 +128,13 @@ void setup() {
     auto task = new ExecWithParameter<int>(readSensor, i);
     sensors[i].task_id = taskManager.scheduleFixedRate(sensors[i].aqui_rate, task, TIME_MILLIS, true); 
   }
-  
+
+  digitalWrite(LEDPin, HIGH); // LED on
+  delay(500);
+  digitalWrite(LEDPin, LOW); // LED off 
+  delay(500);
+
+  LowPower.attachInterruptWakeup(RTC_ALARM_WAKEUP, dummy, CHANGE);
 }
 
 void loop() {
@@ -131,21 +142,26 @@ void loop() {
   
   int millisDelay = (taskManager.microsToNextTask() / 1000UL);
   
-//  if(millisDelay > 100) {
+  if(millisDelay > 100) {
 //    Serial.print("Enter low power for ");
 //    Serial.println(millisDelay);
-//  
-//    // here we call into the low power library for SAMD to reduce power usage for
-//    // the time that no tasks are running.
-////    USBDevice.detach();
-//    LowPower.idle(millisDelay);
-////    USBDevice.attach();
-////    delay(1000);
-////    while(!Serial) {}
-//
-//    //use a LED instead of Serial 
-//  }
   
+    // here we call into the low power library for SAMD to reduce power usage for
+    // the time that no tasks are running.
+    
+    digitalWrite(LEDPin, HIGH); // LED on
+    
+    modem.sleep(millisDelay);
+    LowPower.idle(millisDelay);
+
+    digitalWrite(LEDPin, LOW); // LED off 
+  }
+  
+}
+
+void dummy() {
+  //Only purpose is to make the 
+  volatile int ttt = 0; 
 }
 
 void readSensor(int deviceNumber) {
