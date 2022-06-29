@@ -174,10 +174,7 @@ void readSensor(int deviceNumber) {
   Serial.print(" - ");
   Serial.println(sensors[deviceNumber].aqui_rate); 
 
-  
   float reading;
-
-  //TODO: read digital sensor
 
   selectMuxPin(sensors[deviceNumber].pin);
   

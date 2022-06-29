@@ -31,6 +31,16 @@ boolean averageIsBelowThreshold(float *values, int buffer_size, float thresh) {
   return isBelowThreshold( getAverage(values, buffer_size), thresh );
 }
 
+boolean averageIsBetweenThresholds(float *values, int buffer_size, float thresh_low, float thresh_high) {
+  
+  return isBetweenThresholds( getAverage(values, buffer_size), thresh_low, thresh_high );
+}
+
+
+boolean averageIsOutsideThresholds(float *values, int buffer_size, float thresh_low, float thresh_high) {
+  return isOutsideThresholds( getAverage(values, buffer_size), thresh_low, thresh_high );
+}
+
 boolean useRule(Sensor sensor) {
 
   char *ruleID = sensor.ruleID;
@@ -63,6 +73,14 @@ boolean useRule(Sensor sensor) {
 
       if ( strcmp(ruleID, "averageIsBelowThreshold") == 0 ) {
         return averageIsBelowThreshold(readings, buffer_size, thresh);
+      }
+
+      if ( strcmp(ruleID, "averageIsBetweenThresholds") == 0 ) {
+        return averageIsBetweenThresholds(readings, buffer_size, thresh, thresh_high);
+      }
+
+      if ( strcmp(ruleID, "averageIsOutsideThresholds") == 0 ) {
+        return averageIsOutsideThresholds(readings, buffer_size, thresh, thresh_high);
       }
       
     } else {
